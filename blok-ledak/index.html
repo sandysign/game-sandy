@@ -33,7 +33,8 @@ button{font-family:inherit;cursor:pointer}
 #hMid.low{color:#ff6b6b}
 .chip{background:var(--panel);border-radius:999px;padding:3px 10px;font-weight:800;font-size:13px;white-space:nowrap}
 .chip b{color:var(--acc)}
-#pause{width:40px;height:34px;border:0;border-radius:10px;background:var(--panel);color:var(--ink);font-weight:800}
+#pause,#mus{width:40px;height:34px;border:0;border-radius:10px;background:var(--panel);color:var(--ink);font-weight:800;font-size:17px;flex:none}
+#mus.muted{opacity:.45;text-decoration:line-through}
 #game{grid-area:game;display:grid;place-items:center;padding:2px 4px 6px}
 #cv{display:block;border-radius:8px;box-shadow:0 0 0 3px #1a1120,0 10px 30px #0008}
 .side{display:flex;flex-direction:column;min-height:0;position:relative}
@@ -107,6 +108,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
     <span class="chip" id="cLife">♥ <b id="hLife">3</b></span>
     <span class="chip" id="cSc">Skor <b id="hSc">0</b></span>
     <span class="chip">Koin <b id="hCoin">0</b></span>
+    <button id="mus" aria-label="Musik" aria-pressed="true">♪</button>
     <button id="pause" aria-label="Jeda">II</button>
   </div>
   <div class="side" id="left">
@@ -136,8 +138,8 @@ let duelWins=[0,0],round=1,doorKey=-1,doorShown=false,shake=0,banner=null,comboN
 
 /* ---------- save ---------- */
 const SK='blokledak_save2';
-let save={coins:0,hi:{adv:0,time:0,surv:0},up:{bomb:0,fire:0,speed:0,life:0,shield:0,kick:0}};
-try{const s=JSON.parse(localStorage.getItem(SK)||'null');if(s)save={coins:+s.coins||0,hi:{...save.hi,...s.hi},up:{...save.up,...s.up}};
+let save={music:true,coins:0,hi:{adv:0,time:0,surv:0},up:{bomb:0,fire:0,speed:0,life:0,shield:0,kick:0}};
+try{const s=JSON.parse(localStorage.getItem(SK)||'null');if(s)save={music:s.music!==false,coins:+s.coins||0,hi:{...save.hi,...s.hi},up:{...save.up,...s.up}};
   const old=+localStorage.getItem('blokledak_hi')||0;if(old>save.hi.adv)save.hi.adv=old}catch(e){}
 function persist(){try{localStorage.setItem(SK,JSON.stringify(save))}catch(e){}}
 function addCoins(n){if(mode==='duel')return;runCoins+=n;save.coins+=n;persist()}
@@ -153,7 +155,52 @@ const poolDuel=[['b',3],['f',3],['s',2],['k',1],['r',1],['h',1],['w',1]];
 
 /* ---------- audio ---------- */
 let AC=null;
-function unlock(){try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();else if(AC.state==='suspended')AC.resume()}catch(e){}}
+function unlock(){try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();else if(AC.state==='suspended')AC.resume();musicInit()}catch(e){}}
+
+/* ---------- musik latar (chiptune, dibikin pakai kode) ---------- */
+const BPM=150,CH_A=[45,41,48,43],CH_B=[41,43,40,45];
+const MEL=[
+  [[69,0,72,0,76,0,74,72],[72,0,69,0,65,0,69,0],[67,0,72,0,76,0,79,76],[74,0,71,0,67,0,71,74]],
+  [[76,0,74,0,72,0,74,76],[77,0,76,0,74,0,72,0],[72,0,76,0,79,0,81,79],[79,0,77,0,74,0,71,0]],
+  [[72,72,0,74,0,72,0,69],[71,71,0,72,0,74,0,71],[67,0,71,0,76,0,74,71],[69,0,0,0,72,0,76,0]],
+  [[77,77,0,76,0,74,0,72],[74,74,0,76,0,77,0,79],[76,0,79,0,83,0,79,76],[81,0,0,0,76,0,0,0]]];
+const Mu={bus:null,noise:null,step:0,nextT:0};
+function musicInit(){
+  if(!AC||Mu.bus)return;
+  Mu.bus=AC.createGain();Mu.bus.gain.value=.22;Mu.bus.connect(AC.destination);
+  Mu.noise=AC.createBuffer(1,AC.sampleRate*.5,AC.sampleRate);const d=Mu.noise.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  Mu.nextT=AC.currentTime+.1;setInterval(musicTick,25);
+}
+function tone(m,t,dur,type,vol){
+  const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=440*Math.pow(2,(m-69)/12);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.006);g.gain.exponentialRampToValueAtTime(.001,t+dur);
+  o.connect(g).connect(Mu.bus);o.start(t);o.stop(t+dur+.02);
+}
+function noiseHit(t,hp,vol,dur){
+  const s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=Mu.noise;f.type='highpass';f.frequency.value=hp;
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);s.connect(f).connect(g).connect(Mu.bus);s.start(t);s.stop(t+dur+.02);
+}
+function kickHit(t){
+  const o=AC.createOscillator(),g=AC.createGain();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(45,t+.12);
+  g.gain.setValueAtTime(.8,t);g.gain.exponentialRampToValueAtTime(.001,t+.16);o.connect(g).connect(Mu.bus);o.start(t);o.stop(t+.18);
+}
+function playStep(s,t,d){
+  const bar=Math.floor(s/8),i=s%8,sec=Math.floor(bar/4),b=bar%4,root=(sec<2?CH_A:CH_B)[b],m=MEL[sec][b][i];
+  tone(root+(i%2?12:0),t,d*.85,'triangle',.55);
+  if(m){tone(m,t,d*.9,'square',.11);tone(m+12,t,d*.5,'triangle',.05)}
+  if(i===0||i===4||(sec>=2&&i===7))kickHit(t);
+  if(i===2||i===6)noiseHit(t,1500,.3,.12);
+  noiseHit(t,7000,i%2?.06:.03,.04);
+}
+function musicTick(){
+  if(!AC||AC.state!=='running')return;
+  const now=AC.currentTime,on=save.music&&!document.hidden&&state!=='pause';
+  if(!on||Mu.nextT<now-.25){Mu.nextT=now+.05;if(!on)return}
+  const fast=mode==='time'&&state==='play'&&timeLeft<=20;
+  const d=60/(BPM*(fast?1.18:1))/2;
+  while(Mu.nextT<now+.15){playStep(Mu.step,Mu.nextT,d);Mu.step=(Mu.step+1)%128;Mu.nextT+=d}
+}
+function toggleMusic(){save.music=!save.music;persist();const b=document.getElementById('mus');b.classList.toggle('muted',!save.music);b.setAttribute('aria-pressed',save.music);unlock()}
 function sfx(type){
   if(!AC)return;const t=AC.currentTime;
   if(type==='boom'){
@@ -305,6 +352,7 @@ function vecFor(i){
 addEventListener('keydown',e=>{
   const key=e.key.length===1?e.key.toLowerCase():e.key;keys[key]=true;
   if(key==='p'||key==='Escape'){togglePause();return}
+  if(key==='m'){toggleMusic();return}
   if(mode!=='duel'){if(key===' '||key==='Enter'){e.preventDefault();doBomb(0)}if(key==='x'||key==='z')doRem(0)}
   else{if(key===' '){e.preventDefault();doBomb(0)}if(key==='q')doRem(0);if(key==='Enter')doBomb(1);if(key==='/'||key==='.')doRem(1)}
 });
@@ -314,6 +362,7 @@ function bindBtn(id,fn){const b=$(id);b.addEventListener('pointerdown',e=>{e.pre
 bindBtn('bombL',()=>doBomb(0));bindBtn('remL',()=>doRem(0));
 bindBtn('bombR',()=>doBomb(mode==='duel'?1:0));bindBtn('remR',()=>doRem(mode==='duel'?1:0));
 $('pause').addEventListener('click',togglePause);
+$('mus').addEventListener('click',toggleMusic);$('mus').classList.toggle('muted',!save.music);$('mus').setAttribute('aria-pressed',save.music);
 document.addEventListener('contextmenu',e=>e.preventDefault());
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='play')togglePause()});
 const mqP=matchMedia('(orientation: portrait)');
@@ -679,7 +728,7 @@ function loop(now){
 }
 requestAnimationFrame(loop);
 showCard('menu');
-if(location.search.includes('debug'))window.__bl={get players(){return players},get bombs(){return bombs},get enemies(){return enemies},get state(){return state},levelClear,doBomb,doRem,applyItem};
+if(location.search.includes('debug'))window.__bl={get mu(){return Mu},get players(){return players},get bombs(){return bombs},get enemies(){return enemies},get state(){return state},levelClear,doBomb,doRem,applyItem};
 }
 </script>
 <script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))</script>
