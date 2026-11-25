@@ -1,5 +1,5 @@
 // Network-first: kalau online selalu ambil versi terbaru, kalau offline pakai cache.
-const CACHE='catur-v1';
+const CACHE='catur-v2';
 const FILES=['./','index.html','manifest.json','icon-192.png','icon-512.png','icon-180.png','fonts/nunito-600.woff2','fonts/nunito-800.woff2','lib/chess.js','engine/stockfish-19-lite-single.js','engine/stockfish-19-lite-single.wasm','pieces/wK.svg','pieces/wQ.svg','pieces/wR.svg','pieces/wB.svg','pieces/wN.svg','pieces/wP.svg','pieces/bK.svg','pieces/bQ.svg','pieces/bR.svg','pieces/bB.svg','pieces/bN.svg','pieces/bP.svg'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
