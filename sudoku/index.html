@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151a24" media="(prefers-color-scheme: dark)">
+<title>Sudoku</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sudoku">
+<style>
+@font-face{font-family:Nunito;src:url(fonts/nunito-600.woff2) format('woff2');font-weight:600;font-display:swap}
+@font-face{font-family:Nunito;src:url(fonts/nunito-800.woff2) format('woff2');font-weight:800;font-display:swap}
+/* VOICE: tenang, rapi, fokus
+   IDEA: halaman teka-teki koran yang hidup — kertas, tinta, pensil biru
+   PICTURE: papan 9x9 besar di atas, tidak ada yang lain di sampingnya
+   COLOUR+TYPE: kertas hangat, tinta gelap, biru pensil untuk isian, merah untuk salah; Nunito
+   LAYOUT: header tipis, papan, toolbar, pad angka; landscape: papan kiri, kontrol kanan */
+:root{color-scheme:light dark;
+  --bg:light-dark(#f4f1ea,#151a24);--paper:light-dark(#fffdf8,#1d2330);--ink:light-dark(#1d2433,#e8ecf4);--mut:light-dark(#6b7280,#94a0b4);
+  --line:light-dark(#d9d4c7,#323b4d);--thick:light-dark(#1d2433,#9aa6bb);--pen:light-dark(#2f5fe0,#7aa2ff);
+  --sel:light-dark(#c9d8ff,#2c4170);--hl:light-dark(#ebeef6,#232b3b);--same:light-dark(#dbe4fb,#2a3550);--bad:light-dark(#d93b30,#ff7a70);--badbg:light-dark(#fde4e1,#4a2427);--key:light-dark(#ffffff,#232a38)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.4 Nunito,system-ui,sans-serif;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
+button{font-family:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--pen);outline-offset:2px}
+#app{min-height:100dvh;max-width:560px;margin:0 auto;display:grid;grid-template-rows:auto auto auto 1fr auto;gap:10px;
+  padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+header{display:flex;align-items:center;gap:8px}
+.back{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;color:var(--ink);text-decoration:none;font-size:24px;font-weight:800}
+h1{font-size:26px;line-height:1;margin:0;font-weight:800;letter-spacing:-.5px}
+.newbtn{margin-left:auto;height:40px;padding:0 14px;border:0;border-radius:12px;background:var(--ink);color:var(--bg);font-weight:800;font-size:15px}
+.info{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;color:var(--mut);font-weight:600;padding:0 2px}
+.info b{color:var(--ink);font-weight:800}
+#timer{font-variant-numeric:tabular-nums}
+.boardwrap{container-type:inline-size;width:min(100%,calc(100dvh - 330px));min-width:min(100%,300px);justify-self:center}
+#board{display:grid;grid-template-columns:repeat(9,1fr);aspect-ratio:1;background:var(--paper);border:2.5px solid var(--thick);border-radius:10px;overflow:hidden;box-shadow:0 10px 30px #1d243318}
+.c{position:relative;display:grid;place-items:center;border-right:1px solid var(--line);border-bottom:1px solid var(--line);font-size:6.6cqw;font-weight:800;line-height:1;cursor:pointer;color:var(--pen);transition:background .12s}
+.c.g{color:var(--ink)}
+.c.br{border-right:2.5px solid var(--thick)}.c.bb{border-bottom:2.5px solid var(--thick)}
+.c:nth-child(9n){border-right:0}.c:nth-child(n+73){border-bottom:0}
+.c.hl{background:var(--hl)}.c.same{background:var(--same)}.c.sel{background:var(--sel)}
+.c.bad{color:var(--bad);background:var(--badbg)}.c.bad.sel{background:var(--sel)}
+.c.hint{animation:pop .5s}
+.notes{position:absolute;inset:2px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);font-size:2.4cqw;font-weight:800;color:var(--mut)}
+.notes span{display:grid;place-items:center}
+.notes span.m{color:var(--pen)}
+.win .c{animation:wave .6s both}
+@keyframes wave{40%{transform:scale(.82);background:var(--sel)}}
+@keyframes pop{40%{transform:scale(1.25)}}
+.tools{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-self:end}
+.tool{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;padding:6px 0;min-height:56px;font-size:12px;font-weight:800;color:var(--mut);border-radius:12px;position:relative}
+.tool svg{width:26px;height:26px;stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tool.on{color:var(--pen)}.tool.on svg{stroke:var(--pen)}
+.tool .badge{position:absolute;top:2px;right:calc(50% - 26px);background:var(--pen);color:#fff;border-radius:999px;font-size:10px;padding:1px 6px}
+.tool:active{background:var(--hl)}
+.pad{display:grid;grid-template-columns:repeat(9,1fr);gap:5px;align-self:start}
+.k{background:var(--key);border:0;border-radius:12px;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 2px 0 var(--line);padding:0}
+.k b{font-size:26px;line-height:1;font-weight:800;color:var(--pen)}
+.k small{font-size:10px;color:var(--mut);font-weight:800}
+.k:active{transform:translateY(2px);box-shadow:none}
+.k.done{opacity:.25}
+.notesmode .k b{color:var(--mut);font-size:20px}
+#ov{position:fixed;inset:0;display:grid;place-items:center;background:#0d111a99;z-index:5;padding:16px}
+#ov.hide{display:none}
+.card{background:var(--paper);border-radius:20px;padding:20px;max-width:400px;width:100%;max-height:calc(100dvh - 32px);overflow:auto;box-shadow:0 20px 60px #0006}
+.card h2{margin:0 0 4px;font-size:28px;line-height:1.1;font-weight:800}
+.card p{margin:4px 0 12px;color:var(--mut)}
+.opts{display:grid;gap:8px}
+.opt{display:flex;justify-content:space-between;align-items:center;background:var(--bg);border:2px solid transparent;border-radius:14px;padding:12px 14px;min-height:52px;text-align:left}
+.opt b{font-size:17px;font-weight:800}
+.opt span{font-size:13px;color:var(--mut);white-space:nowrap}
+.opt.daily{border-color:var(--pen)}
+.opt.daily b{color:var(--pen)}
+.cta{width:100%;margin-top:10px;min-height:50px;border:0;border-radius:14px;background:var(--pen);color:#fff;font-weight:800;font-size:17px}
+.cta.alt{background:var(--bg);color:var(--ink)}
+.big{font-size:40px;font-weight:800;font-variant-numeric:tabular-nums;margin:6px 0}
+@media (orientation:landscape) and (max-height:600px){
+  #app{max-width:none;grid-template-columns:auto minmax(260px,420px);grid-template-rows:auto auto 1fr;column-gap:20px;justify-content:center}
+  header{grid-column:1/3}
+  .info{grid-column:2;grid-row:2}
+  .boardwrap{grid-column:1;grid-row:2/5;width:calc(100dvh - 80px);min-width:0}
+  .tools{grid-column:2;grid-row:3;align-self:start}
+  .pad{grid-column:2;grid-row:4;grid-template-columns:repeat(5,1fr)}
+  .k{min-height:50px}
+}
+@media (prefers-reduced-motion:reduce){.win .c,.c.hint{animation:none}.c{transition:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <a class="back" href="../" aria-label="Kembali ke Game Sandy">‹</a>
+    <h1>Sudoku</h1>
+    <button class="newbtn" id="newBtn">Baru</button>
+  </header>
+  <div class="info"><span id="diffLbl">Sedang</span><span>Salah <b id="mis">0/3</b></span><span id="timer">0:00</span></div>
+  <div class="boardwrap"><div id="board" role="grid" aria-label="Papan sudoku"></div></div>
+  <div class="tools">
+    <button class="tool" id="tUndo"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg>Batal</button>
+    <button class="tool" id="tErase"><svg viewBox="0 0 24 24"><path d="M20 20H9L4 15a2 2 0 0 1 0-3l9-9a2 2 0 0 1 3 0l4 4a2 2 0 0 1 0 3l-9 9"/><path d="m8 10 7 7"/></svg>Hapus</button>
+    <button class="tool" id="tNotes"><svg viewBox="0 0 24 24"><path d="M15 4l5 5L9 20H4v-5z"/><path d="m13 6 5 5"/></svg>Catatan</button>
+    <button class="tool" id="tHint"><svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></svg>Petunjuk<span class="badge" id="hintN">3</span></button>
+  </div>
+  <div class="pad" id="pad"></div>
+</div>
+<div id="ov" class="hide"><div class="card" id="card"></div></div>
+
+<script>
+{
+const $=id=>document.getElementById(id);
+const DIFF={easy:{n:'Mudah',clues:40},med:{n:'Sedang',clues:33},hard:{n:'Sulit',clues:28},exp:{n:'Ahli',clues:24}};
+const MAXMIS=3,MAXHINT=3,SK='sudoku_state',ST='sudoku_stats';
+const ROW=i=>Math.floor(i/9),COL=i=>i%9,BOX=i=>Math.floor(ROW(i)/3)*3+Math.floor(COL(i)/3);
+const PEERS=[...Array(81)].map((_,i)=>{const s=new Set();for(let j=0;j<81;j++)if(j!==i&&(ROW(j)===ROW(i)||COL(j)===COL(i)||BOX(j)===BOX(i)))s.add(j);return[...s]});
+
+/* ---------- generator ---------- */
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function shuffle(a,r){for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function cands(g,i){let m=0;for(const j of PEERS[i])if(g[j])m|=1<<g[j];return(~m)&0x3FE}
+function countSol(g,limit){
+  let best=-1,bm=0,bc=10;
+  for(let i=0;i<81;i++)if(!g[i]){const m=cands(g,i);let c=0;for(let v=m;v;v&=v-1)c++;if(c<bc){bc=c;best=i;bm=m;if(c===0)return 0}}
+  if(best<0)return 1;
+  let n=0;
+  for(let d=1;d<=9;d++)if(bm&(1<<d)){g[best]=d;n+=countSol(g,limit-n);g[best]=0;if(n>=limit)break}
+  return n;
+}
+function fill(g,r){
+  const i=g.indexOf(0);if(i<0)return true;
+  const m=cands(g,i);
+  for(const d of shuffle([1,2,3,4,5,6,7,8,9],r))if(m&(1<<d)){g[i]=d;if(fill(g,r))return true;g[i]=0}
+  return false;
+}
+function makePuzzle(diff,seed){
+  const r=mulberry(seed),sol=Array(81).fill(0);fill(sol,r);
+  const puz=sol.slice();let clues=81;
+  const order=shuffle([...Array(41).keys()],r);
+  for(const i of order){
+    if(clues<=DIFF[diff].clues)break;
+    const j=80-i,a=puz[i],b=puz[j];puz[i]=0;puz[j]=0;
+    if(countSol(puz.slice(),2)===1)clues-=i===j?1:2;else{puz[i]=a;puz[j]=b}
+  }
+  // tahap 2: buang sel satu-satu (tanpa simetri) kalau masih kebanyakan angka
+  for(const i of shuffle([...Array(81).keys()],r)){
+    if(clues<=DIFF[diff].clues)break;
+    if(!puz[i])continue;const a=puz[i];puz[i]=0;
+    if(countSol(puz.slice(),2)===1)clues--;else puz[i]=a;
+  }
+  return{puz,sol};
+}
+
+/* ---------- state ---------- */
+let G=null,sel=-1,notesMode=false,winAnim=false;
+let stats={best:{},solved:{},streak:0,lastDaily:''};
+try{stats={...stats,...JSON.parse(localStorage.getItem(ST)||'{}')}}catch(e){}
+try{const s=JSON.parse(localStorage.getItem(SK)||'null');if(s&&s.sol&&s.sol.length===81)G=s}catch(e){}
+const saveG=()=>{try{localStorage.setItem(SK,JSON.stringify(G))}catch(e){}};
+const saveS=()=>{try{localStorage.setItem(ST,JSON.stringify(stats))}catch(e){}};
+const today=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+const fmt=s=>{s=Math.floor(s);const h=Math.floor(s/3600),m=Math.floor(s/60)%60,x=String(s%60).padStart(2,'0');return h?`${h}:${String(m).padStart(2,'0')}:${x}`:`${m}:${x}`};
+
+function newGame(diff,daily){
+  const seed=daily?+today().replace(/-/g,''):Math.floor(Math.random()*2**31);
+  const{puz,sol}=makePuzzle(diff,seed);
+  G={diff,daily:daily?today():null,puz,sol,cur:puz.slice(),notes:Array(81).fill(0),time:0,mis:0,hints:0,done:false,failed:false,hist:[]};
+  sel=-1;notesMode=false;winAnim=false;$('board').classList.remove('win');saveG();render();closeOv();
+}
+
+/* ---------- board ---------- */
+const board=$('board'),cells=[];
+for(let i=0;i<81;i++){
+  const c=document.createElement('div');c.className='c'+(COL(i)%3===2&&COL(i)<8?' br':'')+(ROW(i)%3===2&&ROW(i)<8?' bb':'');
+  c.setAttribute('role','gridcell');c.addEventListener('pointerdown',e=>{e.preventDefault();select(i)});
+  board.appendChild(c);cells.push(c);
+}
+const pad=$('pad');
+for(let d=1;d<=9;d++){const b=document.createElement('button');b.className='k';b.innerHTML=`<b>${d}</b><small></small>`;b.addEventListener('click',()=>input(d));pad.appendChild(b)}
+
+function render(){
+  if(!G)return;
+  const sv=sel>=0?G.cur[sel]:0;
+  for(let i=0;i<81;i++){
+    const c=cells[i],v=G.cur[i],given=G.puz[i]!==0,bad=v&&v!==G.sol[i];
+    let cl='c'+(COL(i)%3===2&&COL(i)<8?' br':'')+(ROW(i)%3===2&&ROW(i)<8?' bb':'');
+    if(given)cl+=' g';if(bad)cl+=' bad';
+    if(sel>=0){if(i===sel)cl+=' sel';else if(sv&&v===sv)cl+=' same';else if(ROW(i)===ROW(sel)||COL(i)===COL(sel)||BOX(i)===BOX(sel))cl+=' hl'}
+    if(c.dataset.h)cl+=' hint';
+    if(c.className!==cl)c.className=cl;
+    let html;
+    if(v)html=String(v);
+    else if(G.notes[i]){html='<div class="notes">';for(let d=1;d<=9;d++)html+=`<span class="${sv===d?'m':''}">${G.notes[i]&(1<<d)?d:''}</span>`;html+='</div>'}
+    else html='';
+    if(c._h!==html){c.innerHTML=html;c._h=html}
+    c.style.animationDelay=winAnim?`${(ROW(i)+COL(i))*35}ms`:'';
+  }
+  const cnt=Array(10).fill(0);for(let i=0;i<81;i++)if(G.cur[i]&&G.cur[i]===G.sol[i])cnt[G.cur[i]]++;
+  [...pad.children].forEach((b,k)=>{const left=9-cnt[k+1];b.classList.toggle('done',left<=0);b.querySelector('small').textContent=left>0?left:''});
+  $('diffLbl').textContent=(G.daily?'Harian · ':'')+DIFF[G.diff].n;
+  $('mis').textContent=`${G.mis}/${MAXMIS}`;
+  $('hintN').textContent=MAXHINT-G.hints;
+  $('tNotes').classList.toggle('on',notesMode);document.body.classList.toggle('notesmode',notesMode);
+  $('timer').textContent=fmt(G.time);
+}
+function select(i){sel=i;render()}
+
+/* ---------- actions ---------- */
+function snap(list){return list.map(i=>({i,v:G.cur[i],n:G.notes[i]}))}
+function input(d){
+  if(!G||G.done||sel<0||G.puz[sel])return;
+  if(notesMode){
+    if(G.cur[sel])return;
+    G.hist.push(snap([sel]));G.notes[sel]^=1<<d;
+  }else{
+    if(G.cur[sel]===d)return;
+    const ch=[sel,...PEERS[sel].filter(j=>G.notes[j]&(1<<d))];
+    G.hist.push(snap(ch));
+    G.cur[sel]=d;G.notes[sel]=0;
+    if(d===G.sol[sel]){for(const j of PEERS[sel])G.notes[j]&=~(1<<d)}
+    else{G.mis++;buzz(60)}
+  }
+  if(G.hist.length>200)G.hist.shift();
+  after();
+}
+function erase(){
+  if(!G||G.done||sel<0||G.puz[sel])return;
+  if(!G.cur[sel]&&!G.notes[sel])return;
+  G.hist.push(snap([sel]));G.cur[sel]=0;G.notes[sel]=0;after();
+}
+function undo(){
+  if(!G||G.done||!G.hist.length)return;
+  for(const s of G.hist.pop()){G.cur[s.i]=s.v;G.notes[s.i]=s.n}
+  after();
+}
+function hint(){
+  if(!G||G.done||G.hints>=MAXHINT)return;
+  let i=sel>=0&&!G.puz[sel]&&G.cur[sel]!==G.sol[sel]?sel:-1;
+  if(i<0){const e=[];for(let j=0;j<81;j++)if(G.cur[j]!==G.sol[j])e.push(j);if(!e.length)return;i=e[Math.floor(Math.random()*e.length)]}
+  const d=G.sol[i];G.hist.push(snap([i,...PEERS[i].filter(j=>G.notes[j]&(1<<d))]));
+  G.cur[i]=d;G.notes[i]=0;for(const j of PEERS[i])G.notes[j]&=~(1<<d);
+  G.hints++;sel=i;cells[i].dataset.h=1;setTimeout(()=>{delete cells[i].dataset.h;render()},500);after();
+}
+function after(){
+  if(G.cur.every((v,i)=>v===G.sol[i]))return win();
+  if(G.mis>=MAXMIS){G.done=true;G.failed=true;saveG();render();setTimeout(()=>showOv('fail'),400);return}
+  saveG();render();
+}
+function win(){
+  G.done=true;sel=-1;winAnim=true;
+  const k=G.diff,newBest=!stats.best[k]||G.time<stats.best[k];
+  if(newBest)stats.best[k]=Math.floor(G.time);
+  stats.solved[k]=(stats.solved[k]||0)+1;
+  if(G.daily&&stats.lastDaily!==G.daily){
+    const y=new Date(G.daily);y.setDate(y.getDate()-1);
+    const yd=`${y.getFullYear()}-${String(y.getMonth()+1).padStart(2,'0')}-${String(y.getDate()).padStart(2,'0')}`;
+    stats.streak=stats.lastDaily===yd?stats.streak+1:1;stats.lastDaily=G.daily;
+  }
+  saveS();saveG();render();$('board').classList.add('win');buzz([30,40,30]);
+  setTimeout(()=>showOv('win',{newBest}),1100);
+}
+function buzz(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
+
+/* ---------- overlay ---------- */
+const ov=$('ov'),card=$('card');
+function closeOv(){ov.classList.add('hide')}
+function showOv(kind,o={}){
+  let h='';
+  const dailyDone=stats.lastDaily===today();
+  if(kind==='new'){
+    const cont=G&&!G.done&&G.cur.some((v,i)=>v!==G.puz[i]);
+    h=`<h2>Main baru</h2><p>Pilih tingkat kesulitan</p><div class="opts">
+      <button class="opt daily" data-a="daily"><b>Tantangan harian</b><span>${dailyDone?'Udah beres hari ini':'Sedang'} · Streak ${stats.streak}</span></button>`+
+      Object.entries(DIFF).map(([k,v])=>`<button class="opt" data-a="d:${k}"><b>${v.n}</b><span>${stats.best[k]?'Terbaik '+fmt(stats.best[k]):'Belum pernah'}${stats.solved[k]?` · ${stats.solved[k]}× beres`:''}</span></button>`).join('')+
+      `</div>${cont||G?`<button class="cta alt" data-a="close">${cont?'Lanjutkan puzzle ini':'Tutup'}</button>`:''}`;
+  }
+  if(kind==='win')h=`<h2>Beres!</h2><p>${G.daily?'Tantangan harian':DIFF[G.diff].n}${o.newBest?' · Rekor baru':''}</p>
+    <div class="big">${fmt(G.time)}</div><p>Salah ${G.mis} · Petunjuk ${G.hints}${G.daily?` · Streak ${stats.streak} hari`:''}<br>Terbaik ${DIFF[G.diff].n}: ${fmt(stats.best[G.diff])}</p>
+    <button class="cta" data-a="new">Main lagi</button>`;
+  if(kind==='fail')h=`<h2>Salah 3 kali</h2><p>Puzzle ini belum beres. Mau ulang dari awal atau cari puzzle baru?</p>
+    <button class="cta" data-a="retry">Ulang puzzle ini</button><button class="cta alt" data-a="new">Puzzle baru</button>`;
+  card.innerHTML=h;ov.classList.remove('hide');const f=card.querySelector('button');if(f)f.focus({preventScroll:true});
+}
+ov.addEventListener('click',e=>{
+  if(e.target===ov&&G&&!G.done){closeOv();return}
+  const b=e.target.closest('[data-a]');if(!b)return;const[a,v]=b.dataset.a.split(':');
+  if(a==='d'||a==='daily'){card.innerHTML='<h2>Lagi bikin puzzle…</h2>';setTimeout(()=>newGame(a==='daily'?'med':v,a==='daily'),30)}
+  if(a==='new')showOv('new');
+  if(a==='close')closeOv();
+  if(a==='retry'){G.cur=G.puz.slice();G.notes=Array(81).fill(0);G.mis=0;G.hints=0;G.hist=[];G.time=0;G.done=false;G.failed=false;sel=-1;saveG();render();closeOv()}
+});
+
+/* ---------- input ---------- */
+$('newBtn').addEventListener('click',()=>showOv('new'));
+$('tUndo').addEventListener('click',undo);$('tErase').addEventListener('click',erase);
+$('tNotes').addEventListener('click',()=>{notesMode=!notesMode;render()});$('tHint').addEventListener('click',hint);
+addEventListener('keydown',e=>{
+  if(!ov.classList.contains('hide'))return;
+  if(e.key>='1'&&e.key<='9'){input(+e.key);return}
+  if(e.key==='Backspace'||e.key==='Delete'||e.key==='0'){erase();return}
+  if(e.key==='n'||e.key==='N'){notesMode=!notesMode;render();return}
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){undo();return}
+  const mv={ArrowUp:-9,ArrowDown:9,ArrowLeft:-1,ArrowRight:1}[e.key];
+  if(mv){e.preventDefault();select(sel<0?40:(sel+mv+81)%81)}
+});
+
+/* ---------- timer ---------- */
+let lastT=performance.now(),acc=0;
+setInterval(()=>{
+  const now=performance.now(),dt=(now-lastT)/1000;lastT=now;
+  if(!G||G.done||document.hidden||!ov.classList.contains('hide'))return;
+  G.time+=dt;$('timer').textContent=fmt(G.time);acc+=dt;if(acc>5){acc=0;saveG()}
+},500);
+document.addEventListener('visibilitychange',()=>{lastT=performance.now();if(document.hidden&&G)saveG()});
+
+if(G){render();if(G.done)showOv('new')}else showOv('new');
+}
+</script>
+<script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))</script>
+</body>
+</html>
